@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Builds the app and runs its unit tests. Used by ../Jenkinsfile via `docker build`
 # (not `docker run -v`, which breaks when Jenkins itself runs in a container —
 # see Jenkinsfile for why).
@@ -21,7 +22,11 @@ WORKDIR /workspace
 COPY . .
 
 ARG LINK_CAMPAIGN=offer1
-RUN chmod +x gradlew \
+# The cache mount keeps Gradle/Android dependencies across builds without
+# baking them into the image layer (unaffected by the same bind-mount issue
+# that broke `docker run -v` — this is Docker's own build cache, not a host path).
+RUN --mount=type=cache,target=/root/.gradle \
+    chmod +x gradlew \
     && ./gradlew --no-daemon testDebugUnitTest assembleDebug \
     && mkdir -p dist \
     && cp app/build/outputs/apk/debug/app-debug.apk dist/vidzo.apk \

@@ -33,7 +33,7 @@ pipeline {
         stage('Build & test (Docker)') {
             steps {
                 sh '''
-                    docker build \
+                    DOCKER_BUILDKIT=1 docker build \
                         --build-arg LINK_CAMPAIGN="$LINK_CAMPAIGN" \
                         -t "vidzo-build:$BUILD_NUMBER" \
                         -f ci/Dockerfile .

@@ -11,62 +11,43 @@ pipeline {
     }
 
     environment {
-        // Build runs inside this Docker image (has JDK 21; the Android SDK is
-        // installed into it on first run and cached in the android-sdk-cache
-        // Docker volume). Change APK_DIR if your server serves apks from
-        // a different folder.
-        APK_DIR     = '/var/www/html/apk'
-        BUILD_IMAGE = 'eclipse-temurin:21-jdk-jammy'
+        // Change this if your server serves apks from a different folder.
+        APK_DIR = '/var/www/html/apk'
     }
 
     options {
         disableConcurrentBuilds()
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     stages {
-        stage('Unit tests') {
+        // Builds with `docker build` (ci/Dockerfile), not `docker run -v $WORKSPACE:...`:
+        // Jenkins itself runs in a container here, so a bind-mount path like
+        // $WORKSPACE only resolves on the real Docker host, not Jenkins' own
+        // filesystem, and silently mounts an empty directory. `docker build`
+        // sends the build context over the Docker API instead, which works
+        // regardless of that — it's the same reason the other two projects on
+        // this server (inoutbilling_frontend/backend) use `docker build`/
+        // `docker-compose` rather than `docker run -v`.
+        stage('Build & test (Docker)') {
             steps {
                 sh '''
-                    docker run --rm \
-                        -v "$WORKSPACE":/workspace \
-                        -v android-sdk-cache:/opt/android-sdk \
-                        -v gradle-cache:/root/.gradle \
-                        -w /workspace \
-                        "$BUILD_IMAGE" \
-                        bash ci/build-in-docker.sh testDebugUnitTest
+                    docker build \
+                        --build-arg LINK_CAMPAIGN="$LINK_CAMPAIGN" \
+                        -t "vidzo-build:$BUILD_NUMBER" \
+                        -f ci/Dockerfile .
                 '''
             }
         }
-        stage('Normal APK') {
+        stage('Extract APKs') {
             steps {
                 sh '''
-                    docker run --rm \
-                        -v "$WORKSPACE":/workspace \
-                        -v android-sdk-cache:/opt/android-sdk \
-                        -v gradle-cache:/root/.gradle \
-                        -w /workspace \
-                        "$BUILD_IMAGE" \
-                        bash ci/build-in-docker.sh assembleDebug
-                    mkdir -p dist
-                    cp app/build/outputs/apk/debug/app-debug.apk dist/vidzo.apk
-                '''
-            }
-        }
-        stage('Campaign APK') {
-            steps {
-                // Gradle rejects anything that is not a short code like offer1.
-                sh '''
-                    docker run --rm \
-                        -v "$WORKSPACE":/workspace \
-                        -v android-sdk-cache:/opt/android-sdk \
-                        -v gradle-cache:/root/.gradle \
-                        -w /workspace \
-                        -e LINK_CAMPAIGN="$LINK_CAMPAIGN" \
-                        "$BUILD_IMAGE" \
-                        bash -c 'bash ci/build-in-docker.sh assembleDebug -Pvidzo.linkCampaign="$LINK_CAMPAIGN"'
-                    cp app/build/outputs/apk/debug/app-debug.apk "dist/vidzo-$LINK_CAMPAIGN.apk"
+                    CID=$(docker create "vidzo-build:$BUILD_NUMBER")
+                    mkdir -p dist app/build
+                    docker cp "$CID":/workspace/dist/. dist/
+                    docker cp "$CID":/workspace/app/build/test-results app/build/test-results 2>/dev/null || true
+                    docker rm "$CID"
                 '''
             }
         }
@@ -81,6 +62,7 @@ pipeline {
         always {
             junit testResults: 'app/build/test-results/**/*.xml', allowEmptyResults: true
             archiveArtifacts artifacts: 'dist/*.apk', allowEmptyArchive: true, fingerprint: true
+            sh 'docker rmi "vidzo-build:$BUILD_NUMBER" || true'
         }
     }
 }

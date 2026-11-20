@@ -61,9 +61,9 @@ adb shell am start -n com.vidzo.browser.debug/com.walyo.browser.MainActivity --e
 ## Jenkins (test APKs from your own server)
 `Jenkinsfile` runs the unit tests, builds `vidzo.apk` (normal) and `vidzo-<code>.apk` (marketing link,
 `-Pvidzo.linkCampaign=<code>`) and copies both to `APK_DIR` (default `/var/www/html/apk`), which the web
-server serves at `https://<your-domain>/apk/…`. The build runs inside the `eclipse-temurin:21-jdk-jammy`
-Docker image (see `BUILD_IMAGE` in `Jenkinsfile`) via `docker run`, so the Jenkins host itself only needs
-Docker (no JDK/Android SDK install on the host). `ci/build-in-docker.sh` installs the Android SDK
-(`platforms;android-36`, `build-tools;36.0.0`) into the `android-sdk-cache` Docker volume on first run and
-reuses it on later builds; Gradle's cache is likewise kept in the `gradle-cache` volume.
+server serves at `https://<your-domain>/apk/…`. The build runs via `docker build -f ci/Dockerfile .`
+(not `docker run -v $WORKSPACE:...` — see the comment in `Jenkinsfile` for why that breaks when Jenkins
+itself runs in a container), so the Jenkins host itself only needs Docker, no JDK/Android SDK installed
+directly. `ci/Dockerfile` installs the Android SDK (`platforms;android-36`, `build-tools;36.0.0`) and
+builds both APKs inside the image; the Jenkinsfile then uses `docker cp` to pull `dist/*.apk` back out.
 These are debug builds with test ads — never upload a `-<code>` build to the Play Store.

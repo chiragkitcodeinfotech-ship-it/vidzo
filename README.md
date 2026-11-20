@@ -60,10 +60,19 @@ adb shell am start -n com.vidzo.browser.debug/com.walyo.browser.MainActivity --e
 
 ## Jenkins (test APKs from your own server)
 `Jenkinsfile` runs the unit tests, builds `vidzo.apk` (normal) and `vidzo-<code>.apk` (marketing link,
-`-Pvidzo.linkCampaign=<code>`) and copies both to `APK_DIR` (default `/var/www/html/apk`), which the web
-server serves at `https://<your-domain>/apk/…`. The build runs via `docker build -f ci/Dockerfile .`
-(not `docker run -v $WORKSPACE:...` — see the comment in `Jenkinsfile` for why that breaks when Jenkins
-itself runs in a container), so the Jenkins host itself only needs Docker, no JDK/Android SDK installed
-directly. `ci/Dockerfile` installs the Android SDK (`platforms;android-36`, `build-tools;36.0.0`) and
-builds both APKs inside the image; the Jenkinsfile then uses `docker cp` to pull `dist/*.apk` back out.
+`-Pvidzo.linkCampaign=<code>`), then publishes both for download at `http://<server>:8091/<file>.apk`
+(`APK_SERVER_PORT` in `Jenkinsfile` — change it if 8091 is already used by something else on your server).
+Downloads are served by a small dedicated `nginx:alpine` container (`vidzo-apk-server`, started
+automatically on first run) rather than `/var/www/html` — Jenkins itself runs in a container here, so a
+plain `cp` in a `sh` step only writes inside Jenkins' own filesystem, never onto the real server; the
+Jenkinsfile instead uses `docker cp` into the running nginx container, which works over the Docker API
+regardless of that. If you'd rather serve the APKs from your main domain/reverse proxy instead of a raw
+port, that needs to be configured directly on the server (outside this repo) to route to port 8091, or to
+the `vidzo-apk-dist` Docker volume these files are stored in.
+
+The build itself runs via `docker build -f ci/Dockerfile .` (not `docker run -v $WORKSPACE:...` — see the
+comment in `Jenkinsfile` for why that breaks when Jenkins itself runs in a container), so the Jenkins host
+only needs Docker, no JDK/Android SDK installed directly. `ci/Dockerfile` installs the Android SDK
+(`platforms;android-36`, `build-tools;36.0.0`) and builds both APKs inside the image; the Jenkinsfile then
+uses `docker cp` to pull `dist/*.apk` back out.
 These are debug builds with test ads — never upload a `-<code>` build to the Play Store.

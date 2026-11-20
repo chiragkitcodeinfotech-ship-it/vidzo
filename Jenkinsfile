@@ -1,4 +1,5 @@
-// Builds the two test APKs and puts them in the web folder so they can be downloaded:
+// Builds the two test APKs and serves them for download via a small nginx
+// container on this server (http://<server>:8091/<file>.apk by default):
 //   vidzo.apk                 → normal users (Cricbuzz tile)
 //   vidzo-<campaign>.apk      → marketing-link users (campaign tile, code must exist in Campaigns.kt)
 // Server setup: see README.md → "Jenkins".
@@ -11,8 +12,14 @@ pipeline {
     }
 
     environment {
-        // Change this if your server serves apks from a different folder.
-        APK_DIR = '/var/www/html/apk'
+        // The APKs are served by a small dedicated nginx container (started
+        // below if missing) on this host port — not /var/www/html, which
+        // doesn't work here: Jenkins itself runs in a container, so a plain
+        // `cp` in a Jenkinsfile `sh` step only writes inside Jenkins' own
+        // filesystem, never onto the real server. Change the port if 8091
+        // is already used by something else on your server.
+        APK_SERVER_NAME = 'vidzo-apk-server'
+        APK_SERVER_PORT = '8091'
     }
 
     options {
@@ -53,7 +60,18 @@ pipeline {
         }
         stage('Publish') {
             steps {
-                sh 'mkdir -p "$APK_DIR" && cp dist/*.apk "$APK_DIR"/'
+                sh '''
+                    if ! docker ps -a --format "{{.Names}}" | grep -qx "$APK_SERVER_NAME"; then
+                        docker run -d --name "$APK_SERVER_NAME" \
+                            -p "$APK_SERVER_PORT":80 \
+                            -v vidzo-apk-dist:/usr/share/nginx/html \
+                            --restart unless-stopped \
+                            nginx:alpine
+                    else
+                        docker start "$APK_SERVER_NAME" >/dev/null 2>&1 || true
+                    fi
+                    docker cp dist/. "$APK_SERVER_NAME":/usr/share/nginx/html/
+                '''
             }
         }
     }

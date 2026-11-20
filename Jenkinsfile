@@ -11,11 +11,12 @@ pipeline {
     }
 
     environment {
-        // Change these three paths if your server uses different folders.
-        JAVA_HOME    = '/usr/lib/jvm/java-21-openjdk-amd64'
-        ANDROID_HOME = '/opt/android-sdk'
-        APK_DIR      = '/var/www/html/apk'
-        PATH         = "${JAVA_HOME}/bin:${PATH}"
+        // Build runs inside this Docker image (has JDK 21; the Android SDK is
+        // installed into it on first run and cached in the android-sdk-cache
+        // Docker volume). Change APK_DIR if your server serves apks from
+        // a different folder.
+        APK_DIR     = '/var/www/html/apk'
+        BUILD_IMAGE = 'eclipse-temurin:21-jdk-jammy'
     }
 
     options {
@@ -27,13 +28,27 @@ pipeline {
     stages {
         stage('Unit tests') {
             steps {
-                sh 'chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest'
+                sh '''
+                    docker run --rm \
+                        -v "$WORKSPACE":/workspace \
+                        -v android-sdk-cache:/opt/android-sdk \
+                        -v gradle-cache:/root/.gradle \
+                        -w /workspace \
+                        "$BUILD_IMAGE" \
+                        bash ci/build-in-docker.sh testDebugUnitTest
+                '''
             }
         }
         stage('Normal APK') {
             steps {
                 sh '''
-                    ./gradlew --no-daemon assembleDebug
+                    docker run --rm \
+                        -v "$WORKSPACE":/workspace \
+                        -v android-sdk-cache:/opt/android-sdk \
+                        -v gradle-cache:/root/.gradle \
+                        -w /workspace \
+                        "$BUILD_IMAGE" \
+                        bash ci/build-in-docker.sh assembleDebug
                     mkdir -p dist
                     cp app/build/outputs/apk/debug/app-debug.apk dist/vidzo.apk
                 '''
@@ -43,7 +58,14 @@ pipeline {
             steps {
                 // Gradle rejects anything that is not a short code like offer1.
                 sh '''
-                    ./gradlew --no-daemon assembleDebug -Pvidzo.linkCampaign="$LINK_CAMPAIGN"
+                    docker run --rm \
+                        -v "$WORKSPACE":/workspace \
+                        -v android-sdk-cache:/opt/android-sdk \
+                        -v gradle-cache:/root/.gradle \
+                        -w /workspace \
+                        -e LINK_CAMPAIGN="$LINK_CAMPAIGN" \
+                        "$BUILD_IMAGE" \
+                        bash -c 'bash ci/build-in-docker.sh assembleDebug -Pvidzo.linkCampaign="$LINK_CAMPAIGN"'
                     cp app/build/outputs/apk/debug/app-debug.apk "dist/vidzo-$LINK_CAMPAIGN.apk"
                 '''
             }

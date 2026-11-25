@@ -1,5 +1,8 @@
 # Vidzo — Play Store Deployment Guide
 
+Primary repo: `github.com/chiragkitcodeinfotech-ship-it/vidzo` (switched from `kananichirag/vidzo-android`
+on 2026-11-25 — that old repo still exists but is no longer used).
+
 Tracking doc for publishing Vidzo (`com.vidzo.browser`) to Google Play. Check items off as we
 finish them. Keep this file updated — it's our shared source of truth for where we are.
 
@@ -13,11 +16,11 @@ Account: ITCODE INFOTECH (Play Console personal account, ID 4816617903312651088)
 |---|------|--------|-----------------|
 | 1 | Real upload keystore (not debug key) | ✅ done | `keystore/vidzo-upload.jks` generated, wired into `app/build.gradle.kts` via `local.properties` (git-ignored). `./gradlew bundleRelease` now produces a real-signed AAB at `app/build/outputs/bundle/release/app-release.aab`. |
 | 2 | Real AdMob IDs in `gradle.properties` | ❌ empty | Release build falls back to **Google's test ad IDs** when these are blank. Serving test ads to real users violates AdMob policy and can get the account suspended. Must be filled in before going live. |
-| 3 | Privacy policy URL | ❌ none yet | Mandatory in Play Console's "App content" section for every app. |
-| 4 | Store listing graphics (icon, feature graphic, screenshots) | ❌ none yet | Required to publish; can't submit without them. |
-| 5 | Content rating questionnaire | ❌ not started | Required. |
-| 6 | Data safety form | ❌ not started | Required — declares what data the app collects (AdMob collects advertising ID etc.). |
-| 7 | Target audience & ads declaration | ❌ not started | Required — declares the app is not aimed at children (important since it shows ads). |
+| 3 | Privacy policy URL | ✅ live | `https://chiragkitcodeinfotech-ship-it.github.io/vidzo/privacy-policy.html` — paste into Play Console's Privacy Policy field. |
+| 4 | Store listing graphics (icon, feature graphic, screenshots) | ✅ done | `store-assets/icon-512.png`, `store-assets/feature-graphic.png`, `store-assets/screenshots/*.png` (6 real app captures) — all uploaded. App name/short/full description filled in. Category: Tools. |
+| 5 | Content rating questionnaire | ✅ done | Category: All Other App Types. All content questions answered No. |
+| 6 | Data safety form | ✅ done | |
+| 7 | Target audience & ads declaration | ✅ done | Target age: 13-15, 16-17, 18+ (excluded under-13 — browsers with unrestricted internet access can't target children). Ads: Yes. Advertising ID: Yes (purpose: advertising/marketing). Health: no health features. |
 
 We'll knock these out in order below.
 
@@ -90,20 +93,32 @@ Need from you (or I can draft copy, you supply images):
 
 ---
 
-## Phase 5 — Create a release
+## Phase 5 — Create a release ✅ Internal testing live
 
-**Recommended path**: Internal testing track first (instant, no review wait), test the real signed build on a device, then promote to Production.
+Release 1 (1.0.0) is "Available to internal testers" (not reviewed by Google — internal testing skips review).
 
-1. Play Console → Testing → Internal testing → Create release
-2. Upload the signed `.aab`
-3. Add release notes (e.g. "Initial release")
-4. Add yourself as a tester (your email), save, start rollout
-5. Install via the opt-in link Play gives you, verify it works on a real device
-6. Once happy: Production → Create release → same AAB → submit for review
+Installed on a real device via internal testing and confirmed working (2026-11-25). First install attempt failed with "Can't download" — resolved itself after a short propagation wait, as expected for a brand-new app's first internal release.
+
+Remaining before Production:
+1. ✅ Category was indeed wrongly set to Social — confirmed and fixed to **Tools** via Store presence → Store settings → App category (2026-11-25).
+2. ✅ Real AdMob account created, app `Vidzo` added, 3 ad units created (App Open, Native, Rewarded). Real IDs in `gradle.properties` (2026-11-25), confirmed baked into rebuilt `app-release.aab`. AdMob app review still pending — ad serving will be limited until Google reviews/approves (can take a couple days), and full ad serving needs the app in Production.
+3. ✅ Done — bumped versionCode to 2 (Play requires each upload to have a higher version code), rebuilt, uploaded as internal testing release 2 (1.0.0), live 2026-11-25.
 
 ---
 
-## Phase 6 — Submit & wait
+## ✅ Phase 6 — Submitted to Production (2026-11-25)
+
+Release 2 (1.0.0) is live in the Production track, targeted at India, awaiting Google's review
+("unreviewed" badge still showing — normal until review completes). 0 installs so far, as expected
+for a brand-new unreviewed submission.
+
+Non-blocking suggestions Play Console surfaced (optional polish, not required to publish):
+- Edge-to-edge display may not show correctly for all users (uses deprecated APIs)
+- R8 memory/performance optimization available
+
+These can be addressed in a future update — they did not block this submission.
+
+## Phase 6 (original) — Submit & wait
 
 - First-time app review typically takes **a few hours to a few days**.
 - Watch for policy rejections in the Play Console "Policy" tab — common first-timer issues: missing privacy policy, incomplete data safety form, ads policy mismatch.

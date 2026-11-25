@@ -1,0 +1,17 @@
+Vidzo is a fast, lightweight web browser for Android, built for people who just want to get online quickly without clutter.
+
+FEATURES
+• Quick-access home screen with your favorite shortcuts — add or remove sites with a long press
+• Multiple tabs that stay open even after you close the app
+• Browsing history so you can find pages you visited before
+• Search with your choice of 5 search engines, with live suggestions as you type
+• Light, dark, or system theme
+• Optional 4-digit PIN lock to keep your browser private
+• Set Vidzo as your default browser in one tap
+• Desktop mode for sites that need the full desktop layout
+• Downloads, file uploads, and full-screen video support
+
+PRIVACY
+Vidzo doesn't require an account or sign-in. Your history, bookmarks, and settings are stored only on your device — never uploaded to any server we run. Read our full privacy policy for details on how advertising works in the app.
+
+Whether you're quickly checking something online or browsing for a while, Vidzo keeps it simple and fast.

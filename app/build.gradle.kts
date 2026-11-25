@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,6 +17,18 @@ val testRewardedId = "ca-app-pub-3940256099942544/5224354917"
 /** Reads a release AdMob id from gradle.properties, falling back to the test id when empty. */
 fun admobId(key: String, fallback: String): String =
     providers.gradleProperty(key).orNull?.takeIf { it.isNotBlank() } ?: fallback
+
+/**
+ * Release upload keystore, read from local.properties (git-ignored — never commit real passwords
+ * to gradle.properties, which is tracked). Falls back to debug signing when absent, so CI/other
+ * machines without the real keystore still build (Play Store release builds require the real one).
+ */
+val releaseSigningProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val releaseStoreFile = releaseSigningProps.getProperty("vidzo.release.storeFile")
+val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() && rootProject.file(releaseStoreFile).exists()
 
 /**
  * Campaign code baked into an APK you share from your own server (sideloaded installs have no
@@ -43,6 +56,17 @@ android {
         buildConfigField("String", "LINK_CAMPAIGN", "\"${linkCampaign()}\"")
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseSigningProps.getProperty("vidzo.release.storePassword")
+                keyAlias = releaseSigningProps.getProperty("vidzo.release.keyAlias")
+                keyPassword = releaseSigningProps.getProperty("vidzo.release.keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -62,8 +86,7 @@ android {
             buildConfigField("String", "AD_APP_OPEN", "\"${admobId("walyo.admob.appOpen", testAppOpenId)}\"")
             buildConfigField("String", "AD_NATIVE", "\"${admobId("walyo.admob.native", testNativeId)}\"")
             buildConfigField("String", "AD_REWARDED", "\"${admobId("walyo.admob.rewarded", testRewardedId)}\"")
-            // TODO: replace with your own upload key before publishing to Play Store.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
         }
     }
 
